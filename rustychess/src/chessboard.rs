@@ -1,8 +1,8 @@
-use std::borrow::Borrow;
+use rustychess_core::pieces::Piece;
 use std::any::Any;
+use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
-use crate::pieces::Piece;
 
 pub trait KeyPair<A, B> {
     /// Obtains the first element of the pair.
@@ -48,7 +48,8 @@ impl<A: Eq + Hash, B: Eq + Hash> Chessboard<A, B> {
     }
 
     pub fn get(&self, a: &A, b: &B) -> Option<&Piece> {
-        self.map.get(&(a, b) as &dyn KeyPair<A, B>)
+        self.map
+            .get(&(a, b) as &dyn KeyPair<A, B>)
             .map(|v| v.downcast_ref().unwrap())
     }
 

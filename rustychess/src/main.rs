@@ -1,30 +1,24 @@
-use pieces::Kind;
-use pieces::Piece;
 use chessboard::Chessboard;
 use chessboard::A;
 use chessboard::B;
-mod pieces;
+use rustychess_core::pgn::Position;
+use rustychess_core::pieces::Kind;
+use rustychess_core::pieces::Piece;
+use rustychess_core::pieces::PieceMovements;
 mod chessboard;
-
-struct Position<'a> {
-    rank: &'a A,
-    file: &'a B,
-}
-const A1: Position = Position{rank: &A::new(&"a"), file: &B::new(&1)};
-
 
 fn main() {
     println!("Hello, world!");
     let mut pawn = Piece::new(Kind::Pawn);
     println!("{}", pawn.move_p());
     for i in 0..5 {
-        pawn.attack();
+        pawn.capture();
     }
     println!("{}", pawn.position());
 
     let mut board = Chessboard::new();
-    board.set(A1.rank, A1.file, pawn);
+    board.set("A", 1, pawn);
 
-    let a = board.get(&A1.rank, &A1.file);
+    let a = board.get(&"A", &1);
     println!("{}", a.unwrap().position())
 }

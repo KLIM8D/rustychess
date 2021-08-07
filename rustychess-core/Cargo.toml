@@ -8,3 +8,5 @@ edition = "2018"
 
 [dependencies]
 failure = "0.1.6"
+hashbrown = "0.11"
+colored = "2"

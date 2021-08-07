@@ -1,5 +1,5 @@
-use rustychess_core::File;
 use rustychess_core::Kind;
+use rustychess_core::Rank;
 use rustychess_core::Rank;
 use rustychess_core::PGN;
 use std::str::FromStr;
@@ -12,12 +12,12 @@ fn test_parse_pawn() {
 
     let from_move = &_move[0];
     assert_eq!(from_move.piece.kind, Kind::Pawn);
-    assert_eq!(from_move.position.file, File::from_str("e").unwrap());
+    assert_eq!(from_move.position.file, Rank::from_str("e").unwrap());
     assert_eq!(from_move.position.rank, Rank::from_str("2").unwrap());
 
     let to_move = &_move[1];
     assert_eq!(to_move.piece.kind, Kind::Pawn);
-    assert_eq!(to_move.position.file, File::from_str("e").unwrap());
+    assert_eq!(to_move.position.file, Rank::from_str("e").unwrap());
     assert_eq!(to_move.position.rank, Rank::from_str("4").unwrap());
 }
 
@@ -29,12 +29,12 @@ fn test_parse_queen() {
 
     let from_move = &_move[0];
     assert_eq!(from_move.piece.kind, Kind::Queen);
-    assert_eq!(from_move.position.file, File::from_str("e").unwrap());
+    assert_eq!(from_move.position.file, Rank::from_str("e").unwrap());
     assert_eq!(from_move.position.rank, Rank::from_str("2").unwrap());
 
     let to_move = &_move[1];
     assert_eq!(to_move.piece.kind, Kind::Queen);
-    assert_eq!(to_move.position.file, File::from_str("e").unwrap());
+    assert_eq!(to_move.position.file, Rank::from_str("e").unwrap());
     assert_eq!(to_move.position.rank, Rank::from_str("4").unwrap());
 }
 
@@ -58,12 +58,12 @@ fn test_parse_all_pieces() {
 
         let from_move = &_move[0];
         assert_eq!(from_move.piece.kind, pieces[i]);
-        assert_eq!(from_move.position.file, File::from_str("e").unwrap());
+        assert_eq!(from_move.position.file, Rank::from_str("e").unwrap());
         assert_eq!(from_move.position.rank, Rank::from_str("2").unwrap());
 
         let to_move = &_move[1];
         assert_eq!(to_move.piece.kind, pieces[i]);
-        assert_eq!(to_move.position.file, File::from_str("e").unwrap());
+        assert_eq!(to_move.position.file, Rank::from_str("e").unwrap());
         assert_eq!(to_move.position.rank, Rank::from_str("4").unwrap());
     }
 }

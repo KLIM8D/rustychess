@@ -47,7 +47,7 @@ impl<A: Eq + Hash, B: Eq + Hash> Chessboard<A, B> {
         }
     }
 
-    pub fn get(&self, a: &A, b: &B) -> Option<&Piece> {
+    pub fn get(&mut self, a: &A, b: &B) -> Option<&Piece> {
         self.map
             .get(&(a, b) as &dyn KeyPair<A, B>)
             .map(|v| v.downcast_ref().unwrap())

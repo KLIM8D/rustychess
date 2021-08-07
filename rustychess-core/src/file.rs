@@ -1,58 +1,111 @@
 use crate::error::Error;
+use std::fmt;
 use std::mem::transmute;
+use std::ops::Add;
 use std::str::FromStr;
 
 /// Describe a file (column) on a chess board
-#[derive(Copy, Clone, PartialEq, PartialOrd, Debug, Hash)]
+#[derive(Eq, Copy, Clone, PartialEq, PartialOrd, Debug, Hash)]
 pub enum File {
-    A,
-    B,
-    C,
-    D,
-    E,
-    F,
-    G,
-    H,
+    First,
+    Second,
+    Third,
+    Fourth,
+    Fifth,
+    Sixth,
+    Seventh,
+    Eighth,
 }
 
-/// How many files are there?
+/// How many ranks are there?
 pub const NUM_FILES: usize = 8;
 
-/// Enumerate all files
+/// Enumerate all ranks
 pub const ALL_FILES: [File; NUM_FILES] = [
-    File::A,
-    File::B,
-    File::C,
-    File::D,
-    File::E,
-    File::F,
-    File::G,
-    File::H,
+    File::First,
+    File::Second,
+    File::Third,
+    File::Fourth,
+    File::Fifth,
+    File::Sixth,
+    File::Seventh,
+    File::Eighth,
 ];
 
 impl File {
-    /// Convert a `usize` into a `File` (the inverse of to_index).  If i > 7, wrap around.
+    /// Convert a `usize` into a `File` (the inverse of to_index).  If the number is > 7, wrap
+    /// around.
     #[inline]
     pub fn from_index(i: usize) -> File {
         unsafe { transmute((i as u8) & 7) }
     }
 
-    /// Go one file to the left.  If impossible, wrap around.
+    /// Go one rank down.  If impossible, wrap around.
     #[inline]
-    pub fn left(&self) -> File {
+    pub fn down(&self) -> File {
         File::from_index(self.to_index().wrapping_sub(1))
     }
 
-    /// Go one file to the right.  If impossible, wrap around.
+    /// Go one file up.  If impossible, wrap around.
     #[inline]
-    pub fn right(&self) -> File {
+    pub fn up(&self) -> File {
         File::from_index(self.to_index() + 1)
     }
 
-    /// Convert this `File` into a `usize` from 0 to 7 inclusive.
+    /// Convert this `File` into a `usize` between 0 and 7 (inclusive).
     #[inline]
     pub fn to_index(&self) -> usize {
         *self as usize
+    }
+
+    #[inline]
+    pub fn to_i8(&self) -> i8 {
+        match self {
+            &File::First => 1,
+            &File::Second => 2,
+            &File::Third => 3,
+            &File::Fourth => 4,
+            &File::Fifth => 5,
+            &File::Sixth => 6,
+            &File::Seventh => 7,
+            &File::Eighth => 8,
+        }
+    }
+
+    pub fn from_i8(s: i8) -> Result<Self, Error> {
+        match s {
+            1 => Ok(File::First),
+            2 => Ok(File::Second),
+            3 => Ok(File::Third),
+            4 => Ok(File::Fourth),
+            5 => Ok(File::Fifth),
+            6 => Ok(File::Sixth),
+            7 => Ok(File::Seventh),
+            8 => Ok(File::Eighth),
+            _ => Err(Error::InvalidFile),
+        }
+    }
+
+    pub fn sub(self, other: Self) -> usize {
+        let mut r = 0;
+        let mut v = self.clone();
+        while v != other {
+            r += 1;
+            if self < other {
+                v = v.up()
+            } else {
+                v = v.down()
+            }
+        }
+        r
+    }
+}
+
+impl fmt::Display for File {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+        // or, alternatively:
+        // fmt::Debug::fmt(self, f)
     }
 }
 
@@ -64,14 +117,14 @@ impl FromStr for File {
             return Err(Error::InvalidFile);
         }
         match s.chars().next().unwrap() {
-            'a' => Ok(File::A),
-            'b' => Ok(File::B),
-            'c' => Ok(File::C),
-            'd' => Ok(File::D),
-            'e' => Ok(File::E),
-            'f' => Ok(File::F),
-            'g' => Ok(File::G),
-            'h' => Ok(File::H),
+            '1' => Ok(File::First),
+            '2' => Ok(File::Second),
+            '3' => Ok(File::Third),
+            '4' => Ok(File::Fourth),
+            '5' => Ok(File::Fifth),
+            '6' => Ok(File::Sixth),
+            '7' => Ok(File::Seventh),
+            '8' => Ok(File::Eighth),
             _ => Err(Error::InvalidFile),
         }
     }

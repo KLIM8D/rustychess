@@ -13,6 +13,12 @@ pub use crate::rank::*;
 pub mod error;
 pub use crate::error::*;
 
+pub mod chessboard;
+pub use crate::chessboard::*;
+
+pub mod game;
+pub use crate::game::*;
+
 #[cfg(test)]
 mod tests {
     #[test]

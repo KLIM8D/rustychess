@@ -8,3 +8,6 @@ edition = "2018"
 
 [dependencies]
 rustychess_core = { path = "../rustychess-core", version = "*" }
+hashbrown = "0.11"
+rustyline = "8.2.0"
+colored = "2"

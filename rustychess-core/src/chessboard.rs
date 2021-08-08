@@ -133,7 +133,7 @@ impl Chessboard2 {
 
                 println!("Piece: {}", piece);
                 let mut moves = piece.possible_moves(*from_pos);
-                //println!("({}) moves: {:?}", moves.len(), moves);
+                println!("({}) moves: {:?}", moves.len(), moves);
 
                 moves = moves
                     .into_iter()
@@ -146,12 +146,37 @@ impl Chessboard2 {
                     })
                     .collect();
 
+                let path = from_pos.shortest_path(*to_pos);
+                let is_blocking = path.iter().any(|pos| {
+                    let piece = self.board.get(pos);
+                    match piece {
+                        Some(_) => true,
+                        _ => false,
+                    }
+                });
+                println!("shortest_path: {:?}", path);
+                println!("is_blocking: {:?}", is_blocking);
+                if is_blocking {
+                    return Err("Invalid move. Own piece blocking".into());
+                }
+
+                let to_piece = self.board.get(to_pos);
+                let is_capture = match to_piece {
+                    Some(p) => p.color != color,
+                    _ => false,
+                };
+                if is_capture {
+                    println!("capture")
+                }
+
                 let is_valid = moves.contains(to_pos);
                 println!("({}) moves: {:?}", moves.len(), moves);
                 println!("is_valid: {:?}", is_valid);
                 if is_valid {
                     self.board.insert(*to_pos, piece);
                     self.board.remove(from_pos);
+                } else {
+                    return Err("Invalid move".into());
                 }
             }
             None => println!("empty"),

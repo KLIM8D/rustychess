@@ -4,10 +4,9 @@ use rustychess_core::pieces::Color;
 use rustychess_core::pieces::Kind;
 use rustychess_core::pieces::Piece;
 use rustychess_core::rank::Rank;
-use std::str::FromStr;
-mod chessboard;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
+use std::str::FromStr;
 
 fn main() {
     /*println!("Hello, world!");

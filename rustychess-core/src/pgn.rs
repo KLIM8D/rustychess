@@ -141,44 +141,75 @@ impl Position {
         return r;
     }
 
+    pub fn shortest_path(self, to: Position) -> Vec<Position> {
+        let mut r = Vec::new();
+        if self.file == to.file {
+            let mut p = self.clone();
+            for _ in 0..(self.rank.sub(to.rank)) {
+                if self.rank < to.rank {
+                    p.rank = p.rank.right();
+                    r.push(p.clone());
+                } else {
+                    p.rank = p.rank.left();
+                    r.push(p.clone());
+                }
+            }
+        } else if self.rank == to.rank {
+            let mut p = self.clone();
+            for _ in 0..(self.file.sub(to.file)) {
+                if self.file < to.file {
+                    p.file = p.file.up();
+                    r.push(p.clone());
+                } else {
+                    p.file = p.file.down();
+                    r.push(p.clone());
+                }
+            }
+        } else {
+            //diagonal move
+            //
+            match to {
+                _ if (self.rank < to.rank) && (self.file < to.file) => {
+                    let mut p = self.clone();
+                    for _ in 0..(self.rank.sub(to.rank)) {
+                        p.rank = p.rank.right();
+                        p.file = p.file.up();
+                        r.push(p.clone());
+                    }
+                }
+                _ if (self.rank < to.rank) && (self.file > to.file) => {
+                    let mut p = self.clone();
+                    for _ in 0..(self.rank.sub(to.rank)) {
+                        p.rank = p.rank.right();
+                        p.file = p.file.down();
+                        r.push(p.clone());
+                    }
+                }
+                _ if (self.rank > to.rank) && (self.file < to.file) => {
+                    let mut p = self.clone();
+                    for _ in 0..(self.file.sub(to.file)) {
+                        p.rank = p.rank.left();
+                        p.file = p.file.up();
+                        r.push(p.clone());
+                    }
+                }
+                _ if (self.rank < to.rank) && (self.file > to.file) => {
+                    let mut p = self.clone();
+                    for _ in 0..(self.file.sub(to.file)) {
+                        p.rank = p.rank.left();
+                        p.file = p.file.down();
+                        r.push(p.clone());
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        r.into_iter().filter(|pos| *pos != to).collect()
+    }
+
     pub fn squares_around(self, limit: i8) -> Vec<Position> {
         let mut r = Vec::new();
-
-        /*{
-            let mut pos = self.clone();
-            pos.rank = pos.rank.right();
-            pos.file = pos.file.up();
-            if self.rank < pos.rank && self.file < pos.file {
-                r.push(pos.clone());
-            }
-        }
-
-        {
-            let mut pos = self.clone();
-            pos.rank = pos.rank.left();
-            pos.file = pos.file.up();
-
-            if self.rank > pos.rank && self.file < pos.file {
-                r.push(pos.clone());
-            }
-        }
-        {
-            let mut pos = self.clone();
-            pos.rank = pos.rank.right();
-            pos.file = pos.file.down();
-            if self.rank < pos.rank && self.file > pos.file {
-                r.push(pos.clone());
-            }
-        }
-        {
-            let mut pos = self.clone();
-            pos.rank = pos.rank.left();
-            pos.file = pos.file.down();
-
-            if self.rank > pos.rank && self.file > pos.file {
-                r.push(pos.clone());
-            }
-        }*/
         r.append(&mut self.diagonals_squares(limit));
         r.append(&mut self.side_squares(limit));
 

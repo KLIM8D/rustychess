@@ -101,7 +101,8 @@ impl Chessboard2 {
         self.set_position(v);
     }
 
-    pub fn move_(&mut self, pgn: &str, color: Color) -> Result<(), Box<dyn Error>> {
+    pub fn move_(&mut self, pgn: &str, color: Color) -> Result<Vec<Piece>, Box<dyn Error>> {
+        let mut r = Vec::new();
         let _move = match PGN::parse(pgn, color) {
             Ok(v) => v,
             Err(e) => return Err(Box::new(e)),
@@ -162,7 +163,14 @@ impl Chessboard2 {
 
                 let to_piece = self.board.get(to_pos);
                 let is_capture = match to_piece {
-                    Some(p) => p.color != color,
+                    Some(p) => {
+                        if p.color != color {
+                            r.push(*p.to_owned());
+                            true
+                        } else {
+                            false
+                        }
+                    }
                     _ => false,
                 };
                 if is_capture {
@@ -182,7 +190,7 @@ impl Chessboard2 {
             None => println!("empty"),
         }
 
-        Ok(())
+        Ok(r)
     }
 
     pub fn print(self) {

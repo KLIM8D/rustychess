@@ -175,7 +175,7 @@ impl PieceMovements for Piece {
                     if position.file == File::Seventh {
                         r.push(Position {
                             rank: position.rank,
-                            file: File::Sixth,
+                            file: File::Fifth,
                         });
                     }
 

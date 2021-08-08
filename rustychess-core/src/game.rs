@@ -20,7 +20,7 @@ impl Game {
     pub fn move_(&mut self, pgn: &str) -> Result<(), Box<dyn Error>> {
         let m = self.board.move_(pgn, self.turn);
         match m {
-            Ok(()) => {
+            Ok(captured_pieces) => {
                 println!("godt");
                 self.turn = self.turn.switch();
             }

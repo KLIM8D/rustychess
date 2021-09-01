@@ -136,16 +136,36 @@ impl Chessboard2 {
                 let mut moves = piece.possible_moves(*from_pos);
                 println!("({}) moves: {:?}", moves.len(), moves);
 
+                // removes squares (moves) that contains a piece with the same color
+                // eg. whites turn, remove all squares from moves that contains a white piece
                 moves = moves
                     .into_iter()
                     .filter(|pos| {
-                        let piece = self.board.get(pos);
-                        match piece {
-                            Some(p) => p.color != color,
+                        let square = self.board.get(pos);
+                        match square {
+                            Some(p) => p.color != color && piece.kind != Kind::Pawn,
                             _ => true,
                         }
                     })
                     .collect();
+
+                let mut possible_captures = if piece.kind == Kind::Pawn {
+                    let diagonal = from_pos.diagonals_squares(1);
+                    diagonal
+                        .into_iter()
+                        .filter(|pos| {
+                            let piece = self.board.get(pos);
+                            match piece {
+                                Some(p) => p.color != color,
+                                _ => false,
+                            }
+                        })
+                        .collect()
+                } else {
+                    Vec::new()
+                };
+
+                moves.append(&mut possible_captures);
 
                 let path = from_pos.shortest_path(*to_pos);
                 let is_blocking = path.iter().any(|pos| {

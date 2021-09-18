@@ -48,6 +48,22 @@ impl Chessboard2 {
         self.board.get(&Position::new(rank, file))
     }
 
+    pub fn find_piece(
+        &self,
+        kind: Kind,
+        color: Color,
+    ) -> Result<(Position, Piece), Box<dyn Error>> {
+        let a = self
+            .board
+            .iter()
+            .find(|(_, v)| v.color == color && v.kind == kind);
+
+        match a {
+            Some(v) => Ok((*v.0, *v.1.clone())),
+            None => return Err("piece not found".into()),
+        }
+    }
+
     pub fn set_position(&mut self, board: Vec<Option<Box<Piece>>>) {
         let mut rank = Rank::A;
         let mut file = File::First;
@@ -201,8 +217,16 @@ impl Chessboard2 {
                 println!("({}) moves: {:?}", moves.len(), moves);
                 println!("is_valid: {:?}", is_valid);
                 if is_valid {
-                    self.board.insert(*to_pos, piece);
+                    self.board.insert(*to_pos, piece.clone());
                     self.board.remove(from_pos);
+
+                    let is_checked = self.is_checked(color);
+                    if is_checked {
+                        self.board.insert(*from_pos, piece);
+                        self.board.remove(to_pos);
+
+                        return Err("Invalid move".into());
+                    }
                 } else {
                     return Err("Invalid move".into());
                 }
@@ -211,6 +235,44 @@ impl Chessboard2 {
         }
 
         Ok(r)
+    }
+
+    pub fn is_checked(&self, color: Color) -> bool {
+        let found = self.find_piece(Kind::King, color);
+        let king_pos;
+        match found {
+            Ok(v) => {
+                king_pos = v.0;
+                //king = v.1;
+            }
+            Err(e) => {
+                println!("{}", e);
+                return false;
+            }
+        }
+
+        let mut result = false;
+        self.board
+            .iter()
+            .filter(|(_, v)| v.color != color)
+            .for_each(|p| {
+                let opononent_position = p.0;
+                //let piece = p.1;
+                let path = opononent_position.shortest_path(king_pos);
+                let is_blocking = path.iter().any(|pos| {
+                    let piece = self.board.get(pos);
+                    match piece {
+                        Some(_) => true,
+                        _ => false,
+                    }
+                });
+
+                if !is_blocking {
+                    result = true
+                }
+            });
+
+        result
     }
 
     pub fn print(self) {

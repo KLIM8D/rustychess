@@ -33,6 +33,14 @@ pub struct Chessboard2 {
     board: HashMap<Position, Box<Piece>>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum BoardStatus {
+    None,
+    Checkmate,
+    Stalemate,
+    Promote,
+}
+
 impl Chessboard2 {
     pub fn new() -> Chessboard2 {
         Chessboard2 {
@@ -117,8 +125,24 @@ impl Chessboard2 {
         self.set_position(v);
     }
 
-    pub fn move_(&mut self, pgn: &str, color: Color) -> Result<Vec<Piece>, Box<dyn Error>> {
+    pub fn promote(&mut self, pos: &Position, kind: Kind, color: Color) {
+        let piece = self.board.get(pos);
+
+        match piece {
+            Some(_) => {
+                self.set(pos.rank.to_str(), pos.file.to_i8(), Piece::new(kind, color));
+            }
+            None => {}
+        }
+    }
+
+    pub fn move_(
+        &mut self,
+        pgn: &str,
+        color: Color,
+    ) -> Result<(Vec<Piece>, BoardStatus), Box<dyn Error>> {
         let mut r = Vec::new();
+        let mut status = BoardStatus::None;
         let _move = match PGN::parse(pgn, color) {
             Ok(v) => v,
             Err(e) => return Err(Box::new(e)),
@@ -183,11 +207,16 @@ impl Chessboard2 {
 
                 moves.append(&mut possible_captures);
 
-                let path = from_pos.shortest_path(*to_pos);
+                //let shortest_path = from_pos.shortest_path(to_pos);
+                let path: Vec<Position> = from_pos
+                    .shortest_path(*to_pos)
+                    .into_iter()
+                    .filter(|pos| moves.contains(pos))
+                    .collect();
                 let is_blocking = path.iter().any(|pos| {
                     let piece = self.board.get(pos);
                     match piece {
-                        Some(_) => true,
+                        Some(p) => p.color == color,
                         _ => false,
                     }
                 });
@@ -225,16 +254,29 @@ impl Chessboard2 {
                         self.board.insert(*from_pos, piece);
                         self.board.remove(to_pos);
 
-                        return Err("Invalid move".into());
+                        return Err("Invalid move. You're checked".into());
+                    }
+
+                    if self.can_promote(color, to_pos) {
+                        status = BoardStatus::Promote;
+                        println!("can promote")
                     }
                 } else {
                     return Err("Invalid move".into());
                 }
             }
-            None => println!("empty"),
+            None => return Err("Invalid move. Field empty!".into()),
         }
 
-        Ok(r)
+        Ok((r, status))
+    }
+
+    pub fn can_promote(&self, color: Color, pos: &Position) -> bool {
+        if color == Color::White {
+            return pos.file == File::Eighth;
+        }
+
+        pos.file == File::First
     }
 
     pub fn is_checked(&self, color: Color) -> bool {
@@ -251,24 +293,47 @@ impl Chessboard2 {
             }
         }
 
+        println!("---------------------------------------_");
         let mut result = false;
         self.board
             .iter()
             .filter(|(_, v)| v.color != color)
             .for_each(|p| {
                 let opononent_position = p.0;
-                //let piece = p.1;
-                let path = opononent_position.shortest_path(king_pos);
-                let is_blocking = path.iter().any(|pos| {
+                let mut piece = *p.1.clone();
+                let possible_moves = piece.possible_moves(*opononent_position);
+                let shortest_path: Vec<Position> = opononent_position
+                    .shortest_path(king_pos)
+                    .into_iter()
+                    .filter(|pos| possible_moves.contains(pos))
+                    .collect();
+
+                let can_capture = shortest_path.iter().any(|&x| x == king_pos);
+                let is_blocking = shortest_path.iter().any(|pos| {
                     let piece = self.board.get(pos);
+                    if *pos == king_pos {
+                        return false;
+                    }
                     match piece {
                         Some(_) => true,
                         _ => false,
                     }
                 });
 
-                if !is_blocking {
-                    result = true
+                if can_capture && !is_blocking {
+                    println!("Kind: {:?}", piece.kind);
+                    println!("Path: {:?}", shortest_path);
+                    println!("can_capture: {:?}", can_capture);
+                    println!("is_blocking: {:?}", is_blocking);
+                    result = true;
+                    return;
+                }
+
+                if can_capture && is_blocking {
+                    println!("Kind: {:?}", piece.kind);
+                    println!("Path: {:?}", shortest_path);
+                    println!("can_capture: {:?}", can_capture);
+                    println!("is_blocking: {:?}", is_blocking);
                 }
             });
 

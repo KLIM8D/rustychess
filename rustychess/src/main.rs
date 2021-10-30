@@ -1,3 +1,4 @@
+use rustychess_core::chessboard::BoardStatus;
 use rustychess_core::file::File;
 use rustychess_core::game::Game;
 use rustychess_core::pieces::Color;
@@ -74,8 +75,17 @@ fn main() {
                         let from = s[1];
                         let to = s[2];
                         let s = format!("{}{}", from, to);
-                        match game.move_(s.as_str()) {
-                            Ok(v) => println!("ok"),
+                        let status = game.move_(s.as_str());
+                        match status {
+                            Ok(v) => {
+                                match v {
+                                    BoardStatus::Promote => {
+                                        let kind = promote(&mut rl);
+                                    }
+                                    _ => {}
+                                }
+                                println!("ok")
+                            }
                             Err(e) => println!("{}", e),
                         };
                     }
@@ -93,6 +103,30 @@ fn main() {
             Err(err) => {
                 println!("Error: {:?}", err);
                 break;
+            }
+        }
+    }
+
+    fn promote(rl: &mut Editor<()>) -> Kind {
+        println!("Promote pawn, options: Q, R, K, B");
+        loop {
+            let readline = rl.readline(">> ");
+            match readline {
+                Ok(line) => {
+                    let s = line.as_str();
+                    match s {
+                        "q" | "Q" => return Kind::Queen,
+                        "r" | "R" => return Kind::Rook,
+                        "k" | "K" => return Kind::Knight,
+                        "b" | "B" => return Kind::Bishop,
+                        _ => {
+                            println!("not valid, options: Q, R, K, B");
+                        }
+                    }
+                }
+                Err(err) => {
+                    println!("Error: {:?}", err);
+                }
             }
         }
     }

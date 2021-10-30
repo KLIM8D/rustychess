@@ -205,7 +205,7 @@ impl Position {
             }
         }
 
-        r.into_iter().filter(|pos| *pos != to).collect()
+        r.into_iter().filter(|pos| *pos != self).collect()
     }
 
     pub fn squares_around(self, limit: i8) -> Vec<Position> {

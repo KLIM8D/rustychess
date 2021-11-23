@@ -23,6 +23,12 @@ pub struct Position {
     pub file: File,
 }
 
+impl fmt::Display for Position {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}{:?}", self.rank, self.file,)
+    }
+}
+
 impl Position {
     pub fn new(rank: &str, file: i8) -> Position {
         Position {
@@ -37,6 +43,12 @@ impl Position {
         }
     }
 
+    pub fn new_(rank: Rank, file: File) -> Position {
+        Position {
+            file: file,
+            rank: rank,
+        }
+    }
     pub fn diagonals_squares(self, limit: i8) -> Vec<Position> {
         let mut r = Vec::new();
         let mut positions = vec![self.clone(), self.clone(), self.clone(), self.clone()];

@@ -1,4 +1,5 @@
 use crate::file::File;
+use crate::game::Move;
 use crate::pgn::Position;
 use crate::pgn::PGN;
 use crate::pieces::Color;
@@ -9,7 +10,6 @@ use crate::rank::Rank;
 use crate::rank::ALL_RANKS;
 use colored::*;
 use hashbrown::HashMap;
-use std::collections::HashSet;
 use std::error::Error;
 
 /*trait GetSimple {
@@ -48,12 +48,27 @@ impl Chessboard2 {
         }
     }
 
+    pub fn set_(&mut self, pos: Position, v: Box<Piece>) {
+        self.board.insert(pos, v);
+    }
+
     pub fn set(&mut self, rank: &str, file: i8, v: Box<Piece>) {
         self.board.insert(Position::new(rank, file), v);
     }
 
     pub fn get(&self, rank: &str, file: i8) -> Option<&Box<Piece>> {
         self.board.get(&Position::new(rank, file))
+    }
+
+    pub fn remove(&mut self, pos: Position) -> Option<Piece> {
+        match self.board.get(&pos) {
+            Some(v) => {
+                let r = *v.clone();
+                self.board.remove(&pos);
+                Some(r)
+            }
+            None => (None),
+        }
     }
 
     pub fn find_piece(
@@ -140,8 +155,7 @@ impl Chessboard2 {
         &mut self,
         pgn: &str,
         color: Color,
-    ) -> Result<(Vec<Piece>, BoardStatus), Box<dyn Error>> {
-        let mut r = Vec::new();
+    ) -> Result<(Move, BoardStatus), Box<dyn Error>> {
         let mut status = BoardStatus::None;
         let _move = match PGN::parse(pgn, color) {
             Ok(v) => v,
@@ -226,11 +240,17 @@ impl Chessboard2 {
                     return Err("Invalid move. Own piece blocking".into());
                 }
 
+                let mut m = Move {
+                    from: *from_pos,
+                    to: *to_pos,
+                    piece: *piece,
+                    capture: None,
+                };
                 let to_piece = self.board.get(to_pos);
                 let is_capture = match to_piece {
                     Some(p) => {
                         if p.color != color {
-                            r.push(*p.to_owned());
+                            m.capture = Some(**p);
                             true
                         } else {
                             false
@@ -238,25 +258,18 @@ impl Chessboard2 {
                     }
                     _ => false,
                 };
+
                 if is_capture {
                     println!("capture")
                 }
 
+                println!("{:#?}", m);
+
                 let is_valid = moves.contains(to_pos);
                 println!("({}) moves: {:?}", moves.len(), moves);
                 println!("is_valid: {:?}", is_valid);
+
                 if is_valid {
-                    self.board.insert(*to_pos, piece.clone());
-                    self.board.remove(from_pos);
-
-                    let is_checked = self.is_checked(color);
-                    if is_checked {
-                        self.board.insert(*from_pos, piece);
-                        self.board.remove(to_pos);
-
-                        return Err("Invalid move. You're checked".into());
-                    }
-
                     if self.can_promote(color, to_pos) {
                         status = BoardStatus::Promote;
                         println!("can promote")
@@ -264,11 +277,11 @@ impl Chessboard2 {
                 } else {
                     return Err("Invalid move".into());
                 }
+
+                Ok((m, status))
             }
             None => return Err("Invalid move. Field empty!".into()),
         }
-
-        Ok((r, status))
     }
 
     pub fn can_promote(&self, color: Color, pos: &Position) -> bool {
@@ -293,7 +306,6 @@ impl Chessboard2 {
             }
         }
 
-        println!("---------------------------------------_");
         let mut result = false;
         self.board
             .iter()
@@ -301,7 +313,24 @@ impl Chessboard2 {
             .for_each(|p| {
                 let opononent_position = p.0;
                 let mut piece = *p.1.clone();
-                let possible_moves = piece.possible_moves(*opononent_position);
+                let mut possible_moves = piece.possible_moves(*opononent_position);
+                let mut possible_captures = if piece.kind == Kind::Pawn {
+                    let diagonal = opononent_position.diagonals_squares(1);
+                    diagonal
+                        .into_iter()
+                        .filter(|pos| {
+                            let piece = self.board.get(pos);
+                            match piece {
+                                Some(pp) => pp.color == color,
+                                _ => false,
+                            }
+                        })
+                        .collect()
+                } else {
+                    Vec::new()
+                };
+                possible_moves.append(&mut possible_captures);
+
                 let shortest_path: Vec<Position> = opononent_position
                     .shortest_path(king_pos)
                     .into_iter()
@@ -327,13 +356,6 @@ impl Chessboard2 {
                     println!("is_blocking: {:?}", is_blocking);
                     result = true;
                     return;
-                }
-
-                if can_capture && is_blocking {
-                    println!("Kind: {:?}", piece.kind);
-                    println!("Path: {:?}", shortest_path);
-                    println!("can_capture: {:?}", can_capture);
-                    println!("is_blocking: {:?}", is_blocking);
                 }
             });
 

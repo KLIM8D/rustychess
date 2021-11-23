@@ -1,6 +1,7 @@
 use rustychess_core::chessboard::BoardStatus;
 use rustychess_core::file::File;
 use rustychess_core::game::Game;
+use rustychess_core::pgn::Position;
 use rustychess_core::pieces::Color;
 use rustychess_core::pieces::Kind;
 use rustychess_core::pieces::Piece;
@@ -81,6 +82,13 @@ fn main() {
                                 match v {
                                     BoardStatus::Promote => {
                                         let kind = promote(&mut rl);
+                                        game.promote(
+                                            &Position::new(
+                                                &from[0..1],
+                                                from[1..2].parse::<i8>().unwrap(),
+                                            ),
+                                            kind,
+                                        )
                                     }
                                     _ => {}
                                 }
@@ -89,6 +97,7 @@ fn main() {
                             Err(e) => println!("{}", e),
                         };
                     }
+                    "movelist" => game.printmoves(),
                     _ => println!("not valid"),
                 }
             }

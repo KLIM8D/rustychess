@@ -1,7 +1,6 @@
 use crate::error::Error;
 use std::fmt;
 use std::mem::transmute;
-use std::ops::Add;
 use std::str::FromStr;
 
 /// Describe a file (column) on a chess board

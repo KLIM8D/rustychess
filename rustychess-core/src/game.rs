@@ -90,7 +90,8 @@ impl Game {
     }
 
     pub fn move_(&mut self, pgn: &str) -> Result<BoardStatus, Box<dyn Error>> {
-        let result = self.board.move_(pgn, self.turn);
+        let prev_move = self.moves.back();
+        let result = self.board.move_(prev_move, pgn, self.turn);
         match result {
             Ok(r) => {
                 self.add_move(r.0);

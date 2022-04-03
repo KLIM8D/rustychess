@@ -31,20 +31,23 @@ impl GetEnums for Chessboard2 {
 #[derive(Debug, Clone)]
 pub struct Chessboard2 {
     board: HashMap<Position, Box<Piece>>,
+    status: BoardStatus,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BoardStatus {
     None,
     Checkmate,
     Stalemate,
     Promote,
+    EnPassant,
 }
 
 impl Chessboard2 {
     pub fn new() -> Chessboard2 {
         Chessboard2 {
             board: HashMap::new(),
+            status: BoardStatus::None,
         }
     }
 
@@ -153,11 +156,12 @@ impl Chessboard2 {
 
     pub fn move_(
         &mut self,
-        pgn: &str,
+        previous_move: Option<&Move>,
+        notation: &str,
         color: Color,
     ) -> Result<(Move, BoardStatus), Box<dyn Error>> {
         let mut status = BoardStatus::None;
-        let _move = match PGN::parse(pgn, color) {
+        let _move = match PGN::parse(notation, color) {
             Ok(v) => v,
             Err(e) => return Err(Box::new(e)),
         };
@@ -205,16 +209,22 @@ impl Chessboard2 {
 
                 let mut possible_captures = if piece.kind == Kind::Pawn {
                     let diagonal = from_pos.diagonals_squares(1);
-                    diagonal
-                        .into_iter()
-                        .filter(|pos| {
-                            let piece = self.board.get(pos);
-                            match piece {
-                                Some(p) => p.color != color,
-                                _ => false,
-                            }
-                        })
-                        .collect()
+
+                    let mut r = Vec::new();
+                    r.append(
+                        &mut diagonal
+                            .into_iter()
+                            .filter(|pos| {
+                                let piece = self.board.get(pos);
+                                match piece {
+                                    Some(p) => p.color != color,
+                                    _ => false,
+                                }
+                            })
+                            .collect(),
+                    );
+
+                    r
                 } else {
                     Vec::new()
                 };
@@ -246,6 +256,27 @@ impl Chessboard2 {
                     piece: *piece,
                     capture: None,
                 };
+
+                let is_enpassant = !(previous_move.is_none())
+                    && self.is_enpassant(previous_move.unwrap(), *piece, to_pos);
+                if is_enpassant {
+                    moves.push(*to_pos);
+
+                    let enpassant_piece_pos = if color == Color::White {
+                        Position::new_(to_pos.rank, to_pos.file.down())
+                    } else {
+                        Position::new_(to_pos.rank, to_pos.file.up())
+                    };
+
+                    let captured_piece = self.board.get(&enpassant_piece_pos);
+                    m.capture = match captured_piece {
+                        Some(p) => Some(**p),
+                        _ => None,
+                    };
+                    self.board.remove(&enpassant_piece_pos);
+                    println!("en passant possible")
+                }
+
                 let to_piece = self.board.get(to_pos);
                 let is_capture = match to_piece {
                     Some(p) => {
@@ -278,10 +309,33 @@ impl Chessboard2 {
                     return Err("Invalid move".into());
                 }
 
-                Ok((m, status))
+                self.status = status;
+                Ok((m, self.status))
             }
             None => return Err("Invalid move. Field empty!".into()),
         }
+    }
+
+    pub fn is_enpassant(&self, previous_move: &Move, piece: Piece, to: &Position) -> bool {
+        if previous_move.piece.kind != Kind::Pawn || piece.kind != Kind::Pawn {
+            return false;
+        }
+        let white_pawn_4_file = previous_move.piece.color == Color::White
+            && previous_move.from.file == File::Second
+            && previous_move.to.file == File::Fourth;
+
+        let black_pawn_6_file = previous_move.piece.color == Color::Black
+            && previous_move.from.file == File::Seventh
+            && previous_move.to.file == File::Fifth;
+
+        let is_neightbour_file = to.file.sub(previous_move.to.file) == 1;
+        let move_to_same_rank = previous_move.to.rank == to.rank;
+
+        println!("white_pawn_4_file: {:?}", white_pawn_4_file);
+        println!("black_pawn_6_file: {:?}", black_pawn_6_file);
+        println!("is_neightbour_file: {:?}", is_neightbour_file);
+        println!("move_to_same_rank: {:?}", move_to_same_rank);
+        return (white_pawn_4_file || black_pawn_6_file) && is_neightbour_file && move_to_same_rank;
     }
 
     pub fn can_promote(&self, color: Color, pos: &Position) -> bool {

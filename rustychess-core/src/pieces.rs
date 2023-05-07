@@ -5,7 +5,6 @@ use crate::pgn::Position;
 use crate::rank::ALL_RANKS;
 use std::collections::HashSet;
 use std::fmt::{self, Debug};
-use std::iter::FromIterator;
 use std::str::FromStr;
 
 pub trait PieceMovements {
@@ -24,7 +23,7 @@ pub enum Kind {
     King,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Color {
     White,
     Black,
@@ -109,15 +108,16 @@ impl fmt::Display for Kind {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct Piece {
     pub kind: Kind,
     pub color: Color,
+    pub number_of_moves: i8,
 }
 
 impl Piece {
     pub fn new(k: Kind, c: Color) -> Box<Piece> {
-        Box::new(Piece { kind: k, color: c })
+        Box::new(Piece { kind: k, color: c, number_of_moves: 0 })
     }
 }
 
@@ -194,7 +194,7 @@ impl PieceMovements for Piece {
                     position.clone(),
                 ];
 
-                for i in 0..8 {
+                for _ in 0..8 {
                     {
                         let mut pos = positions[0];
                         let (rank, file) = (pos.rank.right(), pos.file.up());
@@ -268,7 +268,7 @@ impl PieceMovements for Piece {
                 r.append(&mut p0.into_iter().collect());
             }
             Kind::Rook => {
-                for rank in std::array::IntoIter::new(ALL_RANKS) {
+                for rank in IntoIterator::into_iter(ALL_RANKS) {
                     if rank != position.rank {
                         r.push(Position {
                             rank,
@@ -277,7 +277,7 @@ impl PieceMovements for Piece {
                     }
                 }
 
-                for file in std::array::IntoIter::new(ALL_FILES) {
+                for file in IntoIterator::into_iter(ALL_FILES) {
                     if file != position.file {
                         r.push(Position {
                             rank: position.rank,
@@ -294,7 +294,7 @@ impl PieceMovements for Piece {
                     position.clone(),
                 ];
 
-                for i in 0..8 {
+                for _ in 0..8 {
                     {
                         let mut pos = positions[0];
                         let (rank, file) = (pos.rank.right(), pos.file.up());
@@ -344,7 +344,7 @@ impl PieceMovements for Piece {
                     }
                 }
 
-                for rank in std::array::IntoIter::new(ALL_RANKS) {
+                for rank in IntoIterator::into_iter(ALL_RANKS) {
                     if rank != position.rank {
                         r.push(Position {
                             rank,
@@ -353,7 +353,7 @@ impl PieceMovements for Piece {
                     }
                 }
 
-                for file in std::array::IntoIter::new(ALL_FILES) {
+                for file in IntoIterator::into_iter(ALL_FILES) {
                     if file != position.file {
                         r.push(Position {
                             rank: position.rank,

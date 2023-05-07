@@ -63,6 +63,10 @@ impl Chessboard2 {
         self.board.get(&Position::new(rank, file))
     }
 
+    pub fn get_with_pos(&self, pos: &Position) -> Option<&Box<Piece>> {
+        self.board.get(pos)
+    }
+
     pub fn remove(&mut self, pos: Position) -> Option<Piece> {
         match self.board.get(&pos) {
             Some(v) => {
@@ -70,7 +74,7 @@ impl Chessboard2 {
                 self.board.remove(&pos);
                 Some(r)
             }
-            None => (None),
+            None => None,
         }
     }
 
@@ -159,9 +163,10 @@ impl Chessboard2 {
         previous_move: Option<&Move>,
         notation: &str,
         color: Color,
+        can_castle: bool,
     ) -> Result<(Move, BoardStatus), Box<dyn Error>> {
         let mut status = BoardStatus::None;
-        let _move = match PGN::parse(notation, color) {
+        let _move = match PGN::parse(notation) {
             Ok(v) => v,
             Err(e) => return Err(Box::new(e)),
         };
@@ -255,6 +260,7 @@ impl Chessboard2 {
                     to: *to_pos,
                     piece: *piece,
                     capture: None,
+                    is_from_orignal_pos: false,
                 };
 
                 let is_enpassant = !(previous_move.is_none())
@@ -275,6 +281,14 @@ impl Chessboard2 {
                     };
                     self.board.remove(&enpassant_piece_pos);
                     println!("en passant possible")
+                }
+
+                let is_castling = self.is_castling(m);
+                if is_castling {
+                    println!("IS CASTLING");
+                    if can_castle {
+                        println!("CAN CASTLE");
+                    }
                 }
 
                 let to_piece = self.board.get(to_pos);
@@ -314,6 +328,93 @@ impl Chessboard2 {
             }
             None => return Err("Invalid move. Field empty!".into()),
         }
+    }
+
+    pub fn is_castling(&self, m: Move) -> bool {
+        let file = if m.piece.color == Color::White {
+            File::First
+        } else {
+            File::Eighth
+        };
+
+        match m.piece.kind {
+            Kind::King => {
+                (m.from.rank == Rank::E && m.from.file == file && m.to.file == file)
+                    && (m.to.rank == Rank::C || m.to.rank == Rank::G)
+            }
+            Kind::Knight => {
+                ((m.from.rank == Rank::A || m.from.rank == Rank::H)
+                    && m.from.file == file
+                    && m.to.file == file)
+                    && (m.to.rank == Rank::D || m.to.rank == Rank::F)
+            }
+            _ => false,
+        }
+    }
+
+    /// Returns whenever a field is threatened by the opononent color
+    /// # Arguments
+    /// * `color`- the color of the player (not the opononent)
+    ///
+    /// # Examples
+    /// ```
+    ///  let color = Color::White;
+    ///  let pos = &Position::new("H", 8);
+    ///  self.is_field_threatened(color, pos);
+    /// ```
+    pub fn is_field_threatened(&self, color: Color, field: &Position) -> bool {
+        return self
+            .board
+            .iter()
+            .filter(|(_, v)| v.color != color)
+            .any(|p| {
+                let opononent_position = p.0;
+                let mut piece = *p.1.clone();
+                let mut possible_moves = piece.possible_moves(*opononent_position);
+                let mut possible_captures = if piece.kind == Kind::Pawn {
+                    let diagonal = opononent_position.diagonals_squares(1);
+                    diagonal
+                        .into_iter()
+                        .filter(|pos| {
+                            let piece = self.board.get(pos);
+                            match piece {
+                                Some(pp) => pp.color == color,
+                                _ => false,
+                            }
+                        })
+                        .collect()
+                } else {
+                    Vec::new()
+                };
+                possible_moves.append(&mut possible_captures);
+
+                let shortest_path: Vec<Position> = opononent_position
+                    .shortest_path(*field)
+                    .into_iter()
+                    .filter(|pos| possible_moves.contains(pos))
+                    .collect();
+
+                let can_capture = shortest_path.iter().any(|&x| x == *field);
+                let is_blocking = shortest_path.iter().any(|pos| {
+                    let piece = self.board.get(pos);
+                    if *pos == *field {
+                        return false;
+                    }
+                    match piece {
+                        Some(_) => true,
+                        _ => false,
+                    }
+                });
+
+                if can_capture && !is_blocking {
+                    println!("Kind: {:?}", piece.kind);
+                    println!("Path: {:?}", shortest_path);
+                    println!("can_capture: {:?}", can_capture);
+                    println!("is_blocking: {:?}", is_blocking);
+                }
+
+                can_capture && !is_blocking
+            });
     }
 
     pub fn is_enpassant(&self, previous_move: &Move, piece: Piece, to: &Position) -> bool {
@@ -360,71 +461,18 @@ impl Chessboard2 {
             }
         }
 
-        let mut result = false;
-        self.board
-            .iter()
-            .filter(|(_, v)| v.color != color)
-            .for_each(|p| {
-                let opononent_position = p.0;
-                let mut piece = *p.1.clone();
-                let mut possible_moves = piece.possible_moves(*opononent_position);
-                let mut possible_captures = if piece.kind == Kind::Pawn {
-                    let diagonal = opononent_position.diagonals_squares(1);
-                    diagonal
-                        .into_iter()
-                        .filter(|pos| {
-                            let piece = self.board.get(pos);
-                            match piece {
-                                Some(pp) => pp.color == color,
-                                _ => false,
-                            }
-                        })
-                        .collect()
-                } else {
-                    Vec::new()
-                };
-                possible_moves.append(&mut possible_captures);
-
-                let shortest_path: Vec<Position> = opononent_position
-                    .shortest_path(king_pos)
-                    .into_iter()
-                    .filter(|pos| possible_moves.contains(pos))
-                    .collect();
-
-                let can_capture = shortest_path.iter().any(|&x| x == king_pos);
-                let is_blocking = shortest_path.iter().any(|pos| {
-                    let piece = self.board.get(pos);
-                    if *pos == king_pos {
-                        return false;
-                    }
-                    match piece {
-                        Some(_) => true,
-                        _ => false,
-                    }
-                });
-
-                if can_capture && !is_blocking {
-                    println!("Kind: {:?}", piece.kind);
-                    println!("Path: {:?}", shortest_path);
-                    println!("can_capture: {:?}", can_capture);
-                    println!("is_blocking: {:?}", is_blocking);
-                    result = true;
-                    return;
-                }
-            });
-
-        result
+        self.is_field_threatened(color, &king_pos)
     }
 
     pub fn print(self) {
-        for rank in std::array::IntoIter::new(ALL_RANKS) {
+        for rank in IntoIterator::into_iter(ALL_RANKS) {
             print!("  {}", rank);
         }
         println!();
         for file in (1..9).rev() {
             print!("{}", file);
 
-            for rank in std::array::IntoIter::new(ALL_RANKS) {
+            for rank in IntoIterator::into_iter(ALL_RANKS) {
                 let piece = self.get(rank.to_str(), file);
                 match piece {
                     Some(p) => print!("[{}]", p),

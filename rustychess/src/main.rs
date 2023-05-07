@@ -2,13 +2,27 @@ use rustychess_core::chessboard::BoardStatus;
 use rustychess_core::file::File;
 use rustychess_core::game::Game;
 use rustychess_core::pgn::Position;
-use rustychess_core::pieces::Color;
 use rustychess_core::pieces::Kind;
-use rustychess_core::pieces::Piece;
 use rustychess_core::rank::Rank;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use std::str::FromStr;
+use std::io::{stdout, Write};
+
+use clap::Parser;
+
+/// Simple program to greet a person
+#[derive(Parser, Debug)]
+#[clap(author, version, about, long_about = None)]
+struct Args {
+    /// Name of the person to greet
+    #[clap(short, long)]
+    name: String,
+
+    /// Number of times to greet
+    #[clap(short, long, default_value_t = 1)]
+    count: u8,
+}
 
 fn main() {
     /*println!("Hello, world!");
@@ -34,13 +48,27 @@ fn main() {
     //&mut ShellIO, &mut T, &[&str]
 
     let mut rl = Editor::<()>::new();
-    loop {
+    'readlineLoop: loop {
         let readline = rl.readline(">> ");
         match readline {
             Ok(line) => {
                 let s = line.split_whitespace().collect::<Vec<&str>>();
                 println!("Line: {}", s[0]);
+
                 match s[0] {
+                    "new" => {
+                        if game.clone().number_of_moves() > 0 {
+                            println!("Game already started..");
+                            continue 'readlineLoop;
+                        }
+
+                        if let Some(name) = s.get(1) {
+                            game.insert_metadata("name".to_string(), name.to_string());
+                        }
+                    }
+                    "metadata" => {
+                        game.clone().print_metadata();
+                    }
                     "print" => {
                         game.board.clone().print();
                     }
@@ -73,8 +101,34 @@ fn main() {
                         }
                     }
                     "move" => {
+                        if s.len() < 3 {
+                            println!("Wrong format");
+                            continue;
+                        }
+
                         let from = s[1];
                         let to = s[2];
+                        if from.len() != 2 || to.len() != 2 {
+                            println!("Wrong format");
+                            continue;
+                        }
+
+                        let mut is_valid = true;
+                        if let Some(r) = s.get(1) {
+                            let (rank, file) = r.split_at(1);
+                            is_valid = Rank::from_str(rank).is_ok() && File::from_str(file).is_ok();
+                        }
+
+                        if let Some(r) = s.get(2) {
+                            let (rank, file) = r.split_at(1);
+                            is_valid = Rank::from_str(rank).is_ok() && File::from_str(file).is_ok();
+                        }
+
+                        if !is_valid {
+                            println!("Wrong format 1");
+                            continue;
+                        }
+
                         let s = format!("{}{}", from, to);
                         let status = game.move_(s.as_str());
                         match status {
@@ -98,6 +152,14 @@ fn main() {
                         };
                     }
                     "movelist" => game.printmoves(),
+                    "save" => {
+                        let mut stdout = stdout();
+                        let result = game.save(&mut stdout);
+                        match result {
+                            Ok(()) => println!("\nSave operation succeeded!"),
+                            Err(error) => println!("\nSave operation failed with error: {:?}", error),
+                        }
+                    },
                     _ => println!("not valid"),
                 }
             }
@@ -137,6 +199,14 @@ fn main() {
                     println!("Error: {:?}", err);
                 }
             }
+        }
+    }
+
+    fn parse_arguments() {
+        let args = Args::parse();
+
+        for _ in 0..args.count {
+            println!("Hello {}!", args.name)
         }
     }
 }

@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate quick_error;
+
 pub mod pgn;
 pub use pgn::*;
 
@@ -18,6 +21,9 @@ pub use crate::chessboard::*;
 
 pub mod game;
 pub use crate::game::*;
+
+pub mod my_reader;
+pub use crate::my_reader::*;
 
 #[cfg(test)]
 mod tests {

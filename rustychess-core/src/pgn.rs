@@ -1,21 +1,37 @@
 use crate::file::File;
-use crate::pieces::Color;
+use crate::my_reader;
 use crate::pieces::Piece;
 use crate::rank::Rank;
-use std::error::Error;
 use std::fmt;
 use std::str::FromStr;
 
-#[derive(Debug)]
-pub struct MyError(String);
+quick_error! {
+    #[derive(Debug)]
+    pub enum MyError{
+        FailedOperation(s: &'static str, errno: i32) {
+            from(errno: i32) -> ("os error", errno)
+            from(e: std::io::Error) -> ("io error", e.raw_os_error().unwrap())
+        }
+        Other(descr: &'static str) {
+            display("Error {}", descr)
+        }
+        String(descr: String) {
+            display("Error {}", descr)
+        }
+        /// Converts from both kinds of utf8 errors
+        Utf8(err: std::str::Utf8Error) {
+            from()
+            from(err: std::string::FromUtf8Error) -> (err.utf8_error())
+        }
+    }
 
-impl fmt::Display for MyError {
+}
+
+/*impl fmt::Display for MyError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "There is an error: {}", self.0)
     }
-}
-
-impl Error for MyError {}
+}*/
 
 #[derive(Hash, Eq, PartialEq, Debug, Copy, Clone, PartialOrd)]
 pub struct Position {
@@ -34,11 +50,11 @@ impl Position {
         Position {
             file: match File::from_str(&file.to_string()) {
                 Ok(v) => v,
-                Err(e) => panic!("error file"),
+                Err(e) => panic!("error file {:?}", e),
             },
             rank: match Rank::from_str(&rank.to_string()) {
                 Ok(v) => v,
-                Err(e) => panic!("error rank"),
+                Err(e) => panic!("error rank {:?}", e),
             },
         }
     }
@@ -241,36 +257,36 @@ impl PGN {
     // Valid formats:
     // Qh4e1 -> move Queen from h4 to e1
     // e2e4 -> move pawn from e2 to e4
-    pub fn parse(m: &str, c: Color) -> Result<Vec<Move>, MyError> {
+    pub fn parse(m: &str) -> Result<Vec<Move>, MyError> {
         let mut r = Vec::new();
 
         let piece = match m.len() {
             0..=4 => 'P',
             5 => m.chars().next().unwrap(),
-            _ => return Err(MyError("error in piece part".into())),
+            _ => return Err(MyError::Other("error in piece part".into())),
         };
 
         let from_rank = match m.len() {
             0..=4 => m.chars().next().unwrap(),
             5 => m.chars().nth(1).unwrap(),
-            _ => return Err(MyError("error in from file".into())),
+            _ => return Err(MyError::Other("error in from file")),
         };
 
         let from_file = match m.len() {
             0..=4 => m.chars().nth(1).unwrap(),
             5 => m.chars().nth(2).unwrap(),
-            _ => return Err(MyError("error in from rank".into())),
+            _ => return Err(MyError::Other("error in from rank".into())),
         };
 
         let to_rank = match m.len() {
             0..=4 => m.chars().nth(2).unwrap(),
             5 => m.chars().nth(3).unwrap(),
-            _ => return Err(MyError("error in to file".into())),
+            _ => return Err(MyError::Other("error in to file".into())),
         };
         let to_file = match m.len() {
             0..=4 => m.chars().nth(3).unwrap(),
             5 => m.chars().nth(4).unwrap(),
-            _ => return Err(MyError("error in to rank".into())),
+            _ => return Err(MyError::Other("error in to rank".into())),
         };
 
         println!(
@@ -281,16 +297,16 @@ impl PGN {
         r.push(Move {
             piece: match Piece::from_str(&piece.to_string()) {
                 Ok(v) => v,
-                Err(e) => return Err(MyError("error piece".into())),
+                Err(e) => return Err(MyError::String(format!("error piece {:?}", e))),
             },
             position: Position {
                 file: match File::from_str(&from_file.to_string()) {
                     Ok(v) => v,
-                    Err(e) => return Err(MyError("push 0 error file".into())),
+                    Err(e) => return Err(MyError::String(format!("push 0 error file {:?}", e))),
                 },
                 rank: match Rank::from_str(&from_rank.to_string()) {
                     Ok(v) => v,
-                    Err(e) => return Err(MyError("error rank".into())),
+                    Err(e) => return Err(MyError::String(format!("error rank {:?}", e))),
                 },
             },
         });
@@ -298,19 +314,35 @@ impl PGN {
         r.push(Move {
             piece: match Piece::from_str(&piece.to_string()) {
                 Ok(v) => v,
-                Err(e) => return Err(MyError("error piece".into())),
+                Err(e) => return Err(MyError::String(format!("error piece {:?}", e))),
             },
             position: Position {
                 file: match File::from_str(&to_file.to_string()) {
                     Ok(v) => v,
-                    Err(e) => return Err(MyError("error file".into())),
+                    Err(e) => return Err(MyError::String(format!("error file {:?}", e))),
                 },
                 rank: match Rank::from_str(&to_rank.to_string()) {
                     Ok(v) => v,
-                    Err(e) => return Err(MyError("error rank".into())),
+                    Err(e) => return Err(MyError::String(format!("error rank {:?}", e))),
                 },
             },
         });
+        Ok(r)
+    }
+
+    pub fn parse_file(path: &str) -> Result<Vec<Move>, MyError> {
+        let r = Vec::new();
+
+        let reader = my_reader::BufReader::open(path);
+        let mut buffer = String::new();
+        match reader {
+            Ok(mut f) => {
+                while let Some(line) = f.read_line(&mut buffer) {
+                    println!("{}", line?.trim());
+                }
+            }
+            Err(e) => panic!("error parsing file {:?}", e),
+        }
         Ok(r)
     }
 }

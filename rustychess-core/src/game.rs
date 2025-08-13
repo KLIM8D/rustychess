@@ -1,15 +1,17 @@
 use crate::chessboard::BoardStatus;
 use crate::chessboard::Chessboard2;
 use crate::pgn::Position;
+use crate::pgn::PGN;
 use crate::pieces::Color;
 use crate::pieces::Kind;
 use crate::pieces::Piece;
-use chrono::{DateTime, Local, Utc};
+use chrono::Local;
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::error::Error;
 use std::fmt::{self, Debug};
 use std::io::{Result as ioResult, Write};
+use crate::pieces::PieceMovements;
 
 #[derive(Copy, Clone, Debug)]
 pub struct Move {
@@ -52,8 +54,8 @@ impl Move {
         };
 
         let capture_str = match self.capture {
-            Some(c) => c.to_string(),
-            None => " ".to_string(),
+            Some(_) => "x",
+            None => "",
         };
 
         let has_moved_str = if self.piece.kind != Kind::Pawn && self.is_from_orignal_pos {
@@ -63,12 +65,12 @@ impl Move {
         };
 
         format!(
-            "{}{}{}{}{}",
+            "{}{}{}{}{} ",
             kind_str,
             has_moved_str,
+            capture_str,
             self.to.rank.to_str(),
             self.to.file.to_i8(),
-            capture_str
         )
     }
 }
@@ -119,6 +121,14 @@ impl Game {
         }
     }
 
+    pub fn metadata_pgn(self, writer: &mut dyn Write) -> ioResult<()> {
+        for (key, value) in self.metadata {
+            writer.write_all(format!("[{}: {}]", key, value).as_bytes())?;
+        }
+
+        Ok(())
+    }
+
     pub fn promote(&mut self, pos: &Position, kind: Kind) {
         self.board.promote(pos, kind, self.turn);
         self.turn = self.turn.switch();
@@ -159,15 +169,8 @@ impl Game {
         }
     }
 
-    pub fn count_moves(
-        &self,
-        piece: &Piece
-    ) -> usize {
-        self
-            .moves
-            .iter()
-            .filter(|m| m.piece == *piece)
-            .count()
+    pub fn count_moves(&self, piece: &Piece) -> usize {
+        self.moves.iter().filter(|m| m.piece == *piece).count()
     }
 
     pub fn find_move(
@@ -226,39 +229,29 @@ impl Game {
             return false;
         }
 
-        let a_rook_pos = if color == Color::White {
-            Position::new("A", 1)
-        } else {
-            Position::new("A", 8)
+        let (a_rook_pos, h_rook_pos, king_pos) = match color {
+            Color::White => (
+                Position::new("A", 1),
+                Position::new("H", 1),
+                Position::new("E", 1),
+            ),
+            Color::Black => (
+                Position::new("A", 8),
+                Position::new("H", 8),
+                Position::new("E", 8),
+            ),
+            _ => panic!("Error! Not a chess color"),
         };
 
-        let king_pos = if color == Color::White {
-            Position::new("E", 1)
-        } else {
-            Position::new("E", 8)
-        };
-        let h_rook_pos = if color == Color::White {
-            Position::new("H", 1)
-        } else {
-            Position::new("H", 8)
-        };
+        let has_moved = [
+            (&Piece::new(Kind::King, color), king_pos),
+            (&Piece::new(Kind::Rook, color), a_rook_pos),
+            (&Piece::new(Kind::Rook, color), h_rook_pos),
+        ]
+        .iter()
+        .any(|&(piece, pos)| self.find_move(piece, Some(&pos), None).is_some());
 
-        let a_rook_has_moved = self.find_move(
-            &Piece::new(Kind::Rook, Color::White),
-            Some(&a_rook_pos),
-            None,
-        );
-
-        let king_has_moved =
-            self.find_move(&Piece::new(Kind::King, Color::White), Some(&king_pos), None);
-
-        let h_rook_has_moved = self.find_move(
-            &Piece::new(Kind::Rook, Color::White),
-            Some(&h_rook_pos),
-            None,
-        );
-
-        if !king_has_moved.is_none() || !a_rook_has_moved.is_none() | !h_rook_has_moved.is_none() {
+        if has_moved {
             return false;
         }
 
@@ -267,24 +260,16 @@ impl Game {
 
         let c: Vec<Position> = short_side.iter().chain(&long_side).copied().collect();
 
-        let any_field_threatened = c.iter().any(|&field| {
-            self.clone()
-                .board
-                .is_field_threatened(color, &field.clone())
-        });
+        let any_field_threatened = c
+            .iter()
+            .any(|&field| self.clone().board.is_field_threatened(color, &field));
 
-        let is_blocking = c.iter().any(|pos| {
-            let piece = self.board.get_with_pos(pos);
-            match piece {
-                Some(_) => true,
-                _ => false,
-            }
-        });
+        let is_blocking = c.iter().any(|pos| self.board.get_with_pos(pos).is_some());
 
-        return any_field_threatened && !is_blocking;
+        any_field_threatened && !is_blocking
     }
 
-    pub fn save(&mut self, writer: &mut dyn Write) -> ioResult<()> {
+    pub fn save(&self, writer: &mut dyn Write) -> ioResult<()> {
         let mut counter = 1;
 
         let (front_slice, back_slice) = self.moves.as_slices();
@@ -315,4 +300,34 @@ impl Game {
 
         Ok(())
     }
+
+    pub fn load(&self, content: String) {
+        let moves = PGN::parse_chess_moves(content.as_str());
+        for m in moves {
+            println!("{:#?}", m);
+            /*let piece = if m.len() == 2 {
+                Piece::new(Kind::Pawn, self.turn)
+            } else {
+                match Piece::from_str(m.as_str()) {
+                    Ok(v) => Box::new(v),
+                    Err(e) => {
+                        println!("Error parsing move '{:?}': {:?}", m, e);
+                        continue; // Skip this invalid move and continue with the next one
+                    }
+                }
+            };*/
+
+            let active_pieces_on_board = self.board.find_pieces(m.piece.kind, self.turn);
+            for (pos, mut piece) in active_pieces_on_board {
+                println!("pos: {:?}", pos);
+                println!("piece: {:?}", piece);
+                let possible_moves = piece.possible_moves(pos);
+                println!("possible moves: {:?}", possible_moves);
+                if possible_moves.contains(&m.position) {
+                    println!("FOUND");
+                }
+            }
+        }
+    }
+
 }

@@ -6,8 +6,16 @@ use rustychess_core::pieces::Kind;
 use rustychess_core::rank::Rank;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
+use rustyline::history::MemHistory;
 use std::str::FromStr;
-use std::io::{stdout, Write};
+use chrono::Local;
+use std::fs::{self, File as StdFile};
+use std::path::Path;
+use std::sync::Arc;
+use rustyline::{DefaultEditor, Result};
+use rustyline::history::DefaultHistory;
+
+mod command;
 
 use clap::Parser;
 
@@ -24,7 +32,7 @@ struct Args {
     count: u8,
 }
 
-fn main() {
+fn main_old() {
     /*println!("Hello, world!");
     let mut pawn = Piece::new(Kind::Pawn);
     println!("{}", pawn.move_p());
@@ -46,8 +54,19 @@ fn main() {
      */
     //board.set("A", 1, pawn);
     //&mut ShellIO, &mut T, &[&str]
+    //
+    //
+    // Create a directory named "saves" if it doesn't exist
+    let save_directory = "saves";
+    if !Path::new(save_directory).exists() {
+        fs::create_dir(save_directory).unwrap();
+    }
 
-    let mut rl = Editor::<()>::new();
+    //let mut rl = Editor::<()>::new();
+    let history = rustyline::history::MemHistory::new();
+    let config = rustyline::Config::builder().auto_add_history(true).build();
+    //let mut rl = rustyline::DefaultEditor::new().unwrap();
+    let mut rl: Editor<(), _> = Editor::with_history(config, history).unwrap();
     'readlineLoop: loop {
         let readline = rl.readline(">> ");
         match readline {
@@ -57,14 +76,7 @@ fn main() {
 
                 match s[0] {
                     "new" => {
-                        if game.clone().number_of_moves() > 0 {
-                            println!("Game already started..");
-                            continue 'readlineLoop;
-                        }
-
-                        if let Some(name) = s.get(1) {
-                            game.insert_metadata("name".to_string(), name.to_string());
-                        }
+                        //new_command()
                     }
                     "metadata" => {
                         game.clone().print_metadata();
@@ -153,11 +165,51 @@ fn main() {
                     }
                     "movelist" => game.printmoves(),
                     "save" => {
-                        let mut stdout = stdout();
-                        let result = game.save(&mut stdout);
-                        match result {
-                            Ok(()) => println!("\nSave operation succeeded!"),
+                        //let mut stdout = stdout();
+                        
+                        // Get the current date and time in the local timezone
+                        let current_datetime = Local::now();
+
+                        // Format the date and time as part of the filename
+                        let formatted_datetime = current_datetime.format("%Y-%m-%d_%H-%M-%S");
+                        let filename = format!("file_{}.txt", formatted_datetime);
+
+                        let file_path = Path::new(save_directory).join(&filename);
+                        // Open a file for writing with the generated filename
+                        let file = StdFile::create(&file_path);
+
+                        match file {
+                            Ok(mut f) => {
+                                let result = game.save(&mut f);
+                                match result {
+                                    Ok(()) => println!("\nSave operation succeeded!"),
+                                    Err(error) => println!("\nSave operation failed with error: {:?}", error),
+                                }
+                            },
                             Err(error) => println!("\nSave operation failed with error: {:?}", error),
+                        }
+
+                    },
+                    "load" => {
+                        if s.len() < 2 {
+                            println!("Wrong format");
+                            continue;
+                        }
+
+                        let path = s[1];
+                        let exist = Path::exists(Path::new(path));
+                        if !exist {
+                            println!("File not found");
+                            continue;
+                        }
+
+                        match std::fs::read_to_string(path) {
+                            Ok(contents) => {
+                                game.load(contents);
+                            },
+                            Err(err) => {
+                                println!("Error reading file: {}", err)
+                            }
                         }
                     },
                     _ => println!("not valid"),
@@ -178,7 +230,7 @@ fn main() {
         }
     }
 
-    fn promote(rl: &mut Editor<()>) -> Kind {
+    fn promote(rl: &mut Editor<(), MemHistory>) -> Kind {
         println!("Promote pawn, options: Q, R, K, B");
         loop {
             let readline = rl.readline(">> ");
@@ -209,4 +261,89 @@ fn main() {
             println!("Hello {}!", args.name)
         }
     }
+
+}
+
+fn new_command(game: Game) {
+    if game.clone().number_of_moves() > 0 {
+        println!("Game already started..");
+        //continue 'readlineLoop;
+    }
+
+    /*if let Some(name) = s.get(1) {
+        game.insert_metadata("name".to_string(), name.to_string());
+    }*/
+}
+
+fn main() -> Result<()> {
+    let mut game = Game::new();
+    /*
+     *
+     * [(R),(N),(B),(Q),(K),(B),(N),(R), (P), (P)...]
+     */
+    //board.set("A", 1, pawn);
+    //&mut ShellIO, &mut T, &[&str]
+    
+    // Create a directory named "saves" if it doesn't exist
+    let save_directory = "saves";
+    if !Path::new(save_directory).exists() {
+        fs::create_dir(save_directory).unwrap();
+    }
+
+    let commands = registered_commands();
+    let h = command::DIYHinter {
+        commands: commands.clone(),
+    };
+
+
+    let mut rl: Editor<command::DIYHinter, DefaultHistory> = Editor::new()?;
+    if rl.load_history("history.txt").is_err() {
+        println!("No previous history.");
+    }
+
+    //rl.set_helper(Some(h));
+
+    loop {
+        let readline = rl.readline("> ");
+        match readline {
+            Ok(line) => {
+                rl.add_history_entry(line.as_str())?;
+                println!("Line: {}", line);
+
+                let tokens: Vec<&str> = line.trim().split_whitespace().collect();
+
+                if let Some((cmd_name, args)) = tokens.split_first() {
+                    if let Some(cmd) = commands.iter().find(|c| c.name() == *cmd_name) {
+                        cmd.run(args);
+                    } else {
+                        println!("Unknown command: {}", cmd_name);
+                    }
+                }
+            },
+            Err(ReadlineError::Interrupted) => {
+                println!("CTRL-C");
+                break
+            },
+            Err(ReadlineError::Eof) => {
+                println!("CTRL-D");
+                break
+            },
+            Err(err) => {
+                println!("Error: {:?}", err);
+                break
+            }
+        }
+    }
+
+    rl.save_history("history.txt");
+
+    Ok(())
+}
+
+fn registered_commands() -> Vec<Arc<dyn command::Command>> {
+    vec![
+        Arc::new(command::HelpCommand),
+        Arc::new(command::GetCommand),
+        // add more commands as needed
+    ]
 }

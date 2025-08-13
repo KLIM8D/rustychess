@@ -248,6 +248,7 @@ impl Position {
 #[derive(Clone, Copy)]
 pub struct PGN {}
 
+#[derive(Debug)]
 pub struct Move {
     pub piece: Piece,
     pub position: Position,
@@ -328,6 +329,73 @@ impl PGN {
             },
         });
         Ok(r)
+    }
+
+    pub fn parse2(m: &str) -> Result<Vec<Move>, MyError> {
+        let mut r = Vec::new();
+
+        let piece = match m.len() {
+            0..=4 => 'P',
+            5 => m.chars().next().unwrap(),
+            _ => return Err(MyError::Other("error in piece part".into())),
+        };
+
+        let to_rank = match m.len() {
+            0..=4 => m.chars().next().unwrap(),
+            5 => m.chars().nth(1).unwrap(),
+            _ => return Err(MyError::Other("error in from file")),
+        };
+
+        let to_file = match m.len() {
+            0..=4 => m.chars().nth(1).unwrap(),
+            5 => m.chars().nth(2).unwrap(),
+            _ => return Err(MyError::Other("error in from rank".into())),
+        };
+
+        println!(
+            "to: {}{}",
+            to_rank, to_file
+        );
+
+        r.push(Move {
+            piece: match Piece::from_str(&piece.to_string()) {
+                Ok(v) => v,
+                Err(e) => return Err(MyError::String(format!("error piece {:?}", e))),
+            },
+            position: Position {
+                file: match File::from_str(&to_file.to_string()) {
+                    Ok(v) => v,
+                    Err(e) => return Err(MyError::String(format!("error file {:?}", e))),
+                },
+                rank: match Rank::from_str(&to_rank.to_string()) {
+                    Ok(v) => v,
+                    Err(e) => return Err(MyError::String(format!("error rank {:?}", e))),
+                },
+            },
+        });
+        Ok(r)
+    }
+
+    pub fn parse_chess_moves(notation: &str) -> Vec<Move> {
+            // Split the input string by spaces
+            let parts: Vec<&str> = notation.split_whitespace().collect();
+
+            // Filter out the parts that are move numbers (e.g., "1.", "2.")
+            let moves: Vec<Move> = parts
+                .into_iter()
+                .filter(|&part| !part.ends_with('.'))
+                .flat_map(|part| {
+                    println!("{}", part);
+                    match PGN::parse2(part) {
+                        Ok(move_) => move_,
+                        Err(_) => {
+                            Vec::new()
+                        },
+                    }
+                })
+                .collect();
+
+            moves
     }
 
     pub fn parse_file(path: &str) -> Result<Vec<Move>, MyError> {

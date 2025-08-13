@@ -94,6 +94,24 @@ impl Chessboard2 {
         }
     }
 
+    pub fn find_pieces(
+        &self,
+        kind: Kind,
+        color: Color,
+    ) -> Vec<(Position, Piece)> {
+        let mut pieces: Vec<(Position, Piece)> = Vec::new();
+
+        self.board
+            .iter()
+            .filter(|(_, piece)| piece.kind == kind && piece.color == color)
+            .for_each(|v| {
+                let p = (*v.0, *v.1.clone());
+                pieces.push(p)
+            });
+
+        pieces
+    }
+
     pub fn set_position(&mut self, board: Vec<Option<Box<Piece>>>) {
         let mut rank = Rank::A;
         let mut file = File::First;
